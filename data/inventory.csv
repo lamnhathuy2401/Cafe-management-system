@@ -1,0 +1,7 @@
+id,name,quantity,unit,minStock,supplier
+1,Coffee Beans (Arabica),45,kg,20,Premium Beans Co.
+2,Milk,15,liters,30,Local Dairy Farm
+3,Sugar,25,kg,10,Sweet Supply Inc.
+4,Paper Cups (12oz),500,pieces,200,Packaging Pro
+5,Croissants,8,pieces,20,Baker's Delight
+

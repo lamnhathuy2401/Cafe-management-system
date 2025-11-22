@@ -1,0 +1,7 @@
+id,number,capacity,status
+1,1,2,available
+2,2,4,occupied
+3,3,4,occupied
+4,4,6,reserved
+5,5,2,available
+6,6,8,available

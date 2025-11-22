@@ -1,0 +1,10 @@
+id,name,category,price,image,description,status
+1,Espresso,Hot Coffee,3.50,https://images.unsplash.com/photo-1510591509098-f4fdc6df5bee?w=400,Cà phê espresso đậm đà,available
+2,Cappuccino,Hot Coffee,4.50,https://images.unsplash.com/photo-1572442388796-11668a67e53d?w=400,Cappuccino với bọt sữa,available
+3,Latte,Hot Coffee,4.75,https://images.unsplash.com/photo-1561882468-9110e03e0f78?w=400,Latte mềm mịn,available
+4,Americano,Hot Coffee,3.75,https://images.unsplash.com/photo-1532004491497-ba35c367d634?w=400,Americano đậm đà,available
+5,Iced Coffee,Cold Coffee,4.25,https://images.unsplash.com/photo-1517487881594-2787fef5ebf7?w=400,Cà phê đá mát lạnh,available
+6,Cold Brew,Cold Coffee,4.50,https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=400,Cold brew mát lạnh,available
+7,Croissant,Pastries,3.25,https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=400,Bánh sừng bò giòn tan,available
+8,Blueberry Muffin,Pastries,3.50,https://images.unsplash.com/photo-1607958996333-41aef7caefaa?w=400,Muffin việt quất thơm ngon,available
+

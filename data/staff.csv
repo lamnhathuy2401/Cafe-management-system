@@ -1,0 +1,5 @@
+id,name,role,email,phone,status,schedule
+1,Sarah Johnson,Barista,sarah@coffee.com,(555) 123-4567,active,"Mon-Fri, 6AM-2PM"
+2,Mike Chen,Cashier,mike@coffee.com,(555) 234-5678,active,"Tue-Sat, 10AM-6PM"
+3,Emily Rodriguez,Barista,emily@coffee.com,(555) 345-6789,active,"Wed-Sun, 7AM-3PM"
+

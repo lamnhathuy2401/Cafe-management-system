@@ -1,0 +1,5 @@
+id,name,email,password,phone,role
+1,Demo Customer,customer@demo.com,customer123,0901234567,customer
+2,Demo Staff,staff@demo.com,staff123,0901234568,staff
+3,Demo Manager,manager@demo.com,manager123,0901234569,manager
+

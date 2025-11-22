@@ -1,0 +1,5 @@
+id,customer_email,customer_name,date,foodRating,serviceRating,comment,status,response
+1,customer@demo.com,John Doe,2025-11-08,5,5,Excellent coffee and very friendly staff!,pending,
+2,customer@demo.com,Jane Smith,2025-11-07,5,5,Best coffee shop in town!,responded,Thank you for your support!
+3,customer@demo.com,Bob Johnson,2025-11-06,3,4,Good service, but my latte was a bit cold.,pending,
+

@@ -1,0 +1,7 @@
+id,staff_email,date,clockIn,clockOut,hours,status
+1,staff@demo.com,2025-11-19,08:00:00,16:30:00,8.5,present
+2,staff@demo.com,2025-11-18,08:05:00,16:25:00,8.33,present
+3,staff@demo.com,2025-11-17,08:10:00,16:35:00,8.42,present
+4,staff@demo.com,2025-11-16,08:00:00,16:00:00,8.0,present
+5,staff@demo.com,2025-11-15,08:15:00,16:30:00,8.25,present
+

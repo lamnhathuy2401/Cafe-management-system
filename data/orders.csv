@@ -1,0 +1,14 @@
+id,customer_email,customer_name,date,total,status,payment_method,payment_status,created_at
+ORD-001,customer@demo.com,,2025-11-15,7.75,completed,cash,paid,2025-11-15 10:30:00
+ORD-002,customer@demo.com,,2025-11-18,4.75,waiting_payment,,pending,2025-11-18 14:20:00
+ORD-003,customer@demo.com,,2025-11-19,6.75,pending,,pending,2025-11-19 09:15:00
+ORD-101,,John Doe,2025-11-19,7.00,pending,,pending,2025-11-19 10:30:00
+ORD-102,,Jane Smith,2025-11-19,8.25,waiting_payment,,pending,2025-11-19 10:45:00
+ORD-103,,Bob Johnson,2025-11-19,4.50,completed,cash,paid,2025-11-19 11:00:00
+
+ORD-20251122080409,customer@demo.com,Demo Customer,2025-11-22,4.5,pending,,pending,2025-11-22 08:04:09
+ORD-20251122080440,,,2025-11-22,9.25,pending,,pending,2025-11-22 08:04:40
+ORD-20251122081730,customer@demo.com,Demo Customer,2025-11-22,8.25,pending,,pending,,2025-11-22 08:17:30
+ORD-20251122081806,,,2025-11-22,9.25,pending,,pending,,2025-11-22 08:18:06
+ORD-20251122083055,,,2025-11-22,17.75,pending,,pending,3,2025-11-22 08:30:55
+ORD-20251122083242,,,2025-11-22,9.25,pending,,pending,2,2025-11-22 08:32:42
