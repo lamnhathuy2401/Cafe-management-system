@@ -113,13 +113,17 @@ Hệ thống quản lý quán cà phê toàn diện được xây dựng bằng 
 ```
 coffee manager/
 ├── main.py                      # Ứng dụng FastAPI và các API endpoints
-├── database.py                  # Module xử lý CSV database
+├── database.py                  # Module xử lý CSV database và CSVSchemas
 ├── init_database.py             # Script khởi tạo database với dữ liệu mẫu
+├── constants.py                 # Constants và enums (roles, status, prefixes)
+├── auth.py                      # Module xác thực và phân quyền (decorators, dependencies)
+├── validators.py                # Module validation tập trung
 ├── requirements.txt             # Các thư viện Python cần thiết
 ├── README.md                    # File này
 ├── README_DATABASE.md           # Tài liệu về database CSV
 ├── DATABASE_SETUP.md            # Hướng dẫn thiết lập database
-├── BAO_CAO_KIEM_TRA_DAC_TA.md  # Báo cáo kiểm tra đặc tả
+├── REFACTORING_ANALYSIS.md     # Phân tích refactoring và các vấn đề
+├── REFACTORING_SUMMARY.md       # Tóm tắt refactoring đã thực hiện
 │
 ├── data/                        # Thư mục chứa các file CSV
 │   ├── users.csv                # Người dùng (khách hàng, nhân viên, quản lý)
@@ -133,18 +137,18 @@ coffee manager/
 │   ├── staff.csv                # Thông tin nhân viên
 │   ├── customers.csv            # Thông tin khách hàng
 │   ├── revenue.csv              # Dữ liệu doanh thu
-│   ├── attendance.csv            # Lịch sử chấm công
+│   ├── attendance.csv           # Lịch sử chấm công
 │   └── reservations.csv         # Đặt bàn trước
 │
 ├── templates/                    # Các template HTML
 │   ├── base.html                # Template cơ sở với styles chung
 │   ├── login.html               # Trang đăng nhập
-│   ├── register.html            # Trang đăng ký
+│   ├── register.html           # Trang đăng ký
 │   ├── forgot_password.html     # Trang quên mật khẩu
 │   ├── reset_password.html      # Trang đặt lại mật khẩu
 │   ├── customer.html            # Dashboard khách hàng
 │   ├── staff.html               # Dashboard nhân viên
-│   └── manager.html             # Dashboard quản lý
+│   └── manager.html              # Dashboard quản lý
 │
 ├── static/                       # Thư mục chứa file tĩnh (CSS, JS, images)
 └── styles/                      # Thư mục chứa file CSS
@@ -334,7 +338,68 @@ Hệ thống sử dụng các file CSV để lưu trữ dữ liệu trong thư m
 
 Xem thêm chi tiết trong `README_DATABASE.md` và `DATABASE_SETUP.md`.
 
+## 🏗️ Kiến Trúc Code
+
+Dự án đã được refactor để cải thiện chất lượng code:
+
+### Modules Chính
+
+- **`constants.py`**: Chứa tất cả constants và enums (UserRole, TableStatus, OrderStatus, etc.)
+- **`auth.py`**: Module xác thực và phân quyền với decorators và FastAPI dependencies
+- **`validators.py`**: Module validation tập trung với các hàm kiểm tra dữ liệu
+- **`database.py`**: Module xử lý CSV database với class `CSVSchemas` chứa tất cả fieldnames
+
+### Các Cải Tiến
+
+- ✅ Loại bỏ code duplication (fieldnames, auth checks, validation)
+- ✅ Thay thế magic strings bằng constants
+- ✅ Tách biệt concerns (separation of concerns)
+- ✅ Sử dụng dependency injection cho authentication
+- ✅ Centralized validation logic
+
+Xem chi tiết trong `REFACTORING_ANALYSIS.md` và `REFACTORING_SUMMARY.md`.
+
 ## 🔧 Tùy Biến và Mở Rộng
+
+### Sử Dụng Các Module Mới
+
+#### Constants
+```python
+from constants import UserRole, TableStatus, OrderStatus
+
+# Thay vì: if user["role"] == "manager"
+if user["role"] == UserRole.MANAGER:
+    # ...
+```
+
+#### Authentication
+```python
+from fastapi import Depends
+from auth import require_manager_role, require_staff_or_manager_role
+
+@app.post("/api/endpoint")
+async def my_endpoint(user: dict = Depends(require_manager_role)):
+    # Chỉ manager mới có thể truy cập
+    pass
+```
+
+#### Validation
+```python
+from validators import validate_positive_float, validate_email, ValidationError
+
+try:
+    price = validate_positive_float(body.get("price"), "Giá bán")
+except ValidationError as e:
+    return handle_validation_error(e)
+```
+
+#### CSVSchemas
+```python
+from database import CSVSchemas
+
+# Thay vì: fieldnames = ["id", "name", "category", ...]
+db.append_csv("menu_items.csv", new_item, CSVSchemas.MENU_ITEMS)
+```
 
 ### Thêm Database Thật
 
@@ -344,6 +409,7 @@ Xem thêm chi tiết trong `README_DATABASE.md` và `DATABASE_SETUP.md`.
 2. Cập nhật `main.py` để sử dụng database thay vì CSV
 3. Tạo models và migrations
 4. Cập nhật `database.py` để sử dụng ORM hoặc raw SQL
+5. Giữ nguyên interface của `CSVSchemas` để dễ migrate
 
 ### Tùy Chỉnh Giao Diện
 
@@ -353,10 +419,16 @@ Xem thêm chi tiết trong `README_DATABASE.md` và `DATABASE_SETUP.md`.
 
 ### Thêm Tính Năng Mới
 
-1. **Thêm route mới**: Thêm endpoint trong `main.py`
+1. **Thêm route mới**: 
+   - Thêm endpoint trong `main.py`
+   - Sử dụng dependencies từ `auth.py` cho authentication
+   - Sử dụng validators từ `validators.py` cho validation
+   - Sử dụng `CSVSchemas` từ `database.py` cho fieldnames
 2. **Tạo template mới**: Tạo file HTML trong `templates/`
 3. **Thêm JavaScript**: Thêm logic JavaScript trong các template hoặc file riêng trong `static/`
-4. **Cập nhật database**: Thêm file CSV mới hoặc cột mới trong file CSV hiện có
+4. **Cập nhật database**: 
+   - Thêm file CSV mới hoặc cột mới trong file CSV hiện có
+   - Cập nhật `CSVSchemas` trong `database.py` nếu thêm cột mới
 
 ### Cải Thiện Bảo Mật
 
@@ -393,15 +465,25 @@ Các tính năng có thể thêm vào:
 - ✅ Xác thực 2 yếu tố
 - ✅ Quản lý quyền chi tiết hơn
 
-## 📄 Giấy Phép
+### Refactoring Đã Hoàn Thành
 
-Đây là dự án demo cho mục đích giáo dục.
+- ✅ Phase 1: Quick Wins
+  - Tạo constants module
+  - Tạo auth module với decorators và dependencies
+  - Tạo validators module
+  - Cập nhật database module với CSVSchemas
+  - Refactor một số endpoints chính
 
-## 📞 Hỗ Trợ
+### Refactoring Kế Hoạch
 
-Nếu có vấn đề hoặc câu hỏi, vui lòng tham khảo tài liệu hoặc liên hệ nhóm phát triển.
+- 🔄 Phase 2: Restructure
+  - Tách main.py thành routes modules
+  - Tạo service layer
+  - Sử dụng Pydantic models
+  - Hoàn thành refactor tất cả endpoints
 
----
-
-**Phiên bản**: 1.0.0  
-**Cập nhật lần cuối**: 2024
+- 🔄 Phase 3: Advanced
+  - Implement Strategy pattern
+  - Tạo models/classes thay vì dict
+  - Cải thiện error handling
+  - Thêm logging

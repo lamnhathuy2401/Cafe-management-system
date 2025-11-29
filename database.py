@@ -93,3 +93,59 @@ def find_many(filename: str, filter_func=None) -> List[Dict]:
         data = [row for row in data if filter_func(row)]
     return data
 
+
+class CSVSchemas:
+    """
+    CSV fieldnames schemas to avoid duplication
+    Centralizes all CSV column definitions
+    """
+    # Users
+    USERS = ["id", "name", "email", "password", "phone", "role"]
+    
+    # Menu Items
+    MENU_ITEMS = ["id", "name", "category", "price", "image", "description", "status"]
+    
+    # Orders
+    ORDERS = [
+        "id", "customer_email", "customer_name", "date", "total", "status",
+        "payment_method", "payment_status", "table_id", "created_at"
+    ]
+    
+    # Order Details
+    ORDER_DETAILS = ["order_id", "menu_item_id", "quantity", "price", "subtotal"]
+    
+    # Tables
+    TABLES = ["id", "number", "capacity", "status"]
+    
+    # Inventory
+    INVENTORY = ["id", "name", "quantity", "unit", "minStock", "supplier"]
+    
+    # Promotions
+    PROMOTIONS = [
+        "id", "code", "name", "description", "discount", "type",
+        "maxDiscount", "minOrder", "startDate", "endDate", "status"
+    ]
+    
+    # Feedback
+    FEEDBACK = [
+        "id", "customer_email", "customer_name", "date", "foodRating",
+        "serviceRating", "comment", "status", "response"
+    ]
+    
+    # Staff
+    STAFF = ["id", "name", "role", "email", "phone", "status", "schedule"]
+    
+    # Customers
+    CUSTOMERS = ["id", "name", "email", "phone", "totalOrders", "totalSpent", "status"]
+    
+    # Revenue
+    REVENUE = ["date", "revenue", "orders"]
+    
+    # Attendance
+    ATTENDANCE = ["id", "staff_email", "date", "clockIn", "clockOut", "hours", "status"]
+    
+    # Reservations
+    RESERVATIONS = [
+        "id", "customer_email", "date", "time", "guests", "notes",
+        "status", "table_id", "created_at"
+    ]

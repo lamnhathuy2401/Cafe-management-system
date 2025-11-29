@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi import FastAPI, Request, Form, HTTPException, Depends
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -7,6 +7,17 @@ from datetime import datetime, timedelta
 from typing import Optional
 import secrets
 import database as db
+from database import CSVSchemas
+import auth
+from constants import (
+    UserRole, TableStatus, OrderStatus, PaymentStatus, 
+    MenuItemStatus, PromotionStatus, OrderPrefix, SessionKey
+)
+from validators import (
+    validate_positive_float, validate_required, validate_email,
+    validate_date_format, validate_future_datetime, validate_date_range,
+    validate_enum, handle_validation_error, ValidationError
+)
 
 app = FastAPI()
 
@@ -25,52 +36,41 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Templates
 templates = Jinja2Templates(directory="templates")
 
-# Helper function to get users from CSV
-def get_users_dict():
-    """Get users as dictionary for quick lookup"""
-    users = db.read_csv("users.csv")
-    return {user["email"]: user for user in users}
-
-# Helper function to check authentication
-def get_current_user(request: Request):
-    user_email = request.session.get("user_email")
-    if user_email:
-        user = db.find_one("users.csv", "email", user_email)
-        return user
-    return None
+# Use get_current_user from auth module
+get_current_user = auth.get_current_user
 
 # Routes
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
-    user = get_current_user(request)
+    user = auth.get_current_user(request)
     if user:
         return RedirectResponse(url=f"/{user['role']}")
     return RedirectResponse(url="/login")
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    user = get_current_user(request)
+    user = auth.get_current_user(request)
     if user:
         return RedirectResponse(url=f"/{user['role']}")
     return templates.TemplateResponse("login.html", {"request": request})
 
 @app.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
-    user = get_current_user(request)
+    user = auth.get_current_user(request)
     if user:
         return RedirectResponse(url=f"/{user['role']}")
     return templates.TemplateResponse("register.html", {"request": request})
 
 @app.get("/forgot-password", response_class=HTMLResponse)
 async def forgot_password_page(request: Request):
-    user = get_current_user(request)
+    user = auth.get_current_user(request)
     if user:
         return RedirectResponse(url=f"/{user['role']}")
     return templates.TemplateResponse("forgot_password.html", {"request": request})
 
 @app.get("/reset-password", response_class=HTMLResponse)
 async def reset_password_page(request: Request, token: str = ""):
-    user = get_current_user(request)
+    user = auth.get_current_user(request)
     if user:
         return RedirectResponse(url=f"/{user['role']}")
     return templates.TemplateResponse("reset_password.html", {"request": request, "token": token})
@@ -96,8 +96,8 @@ async def login(
     if user["password"] != password:
         return JSONResponse({"success": False, "message": "Mật khẩu không đúng"}, status_code=401)
 
-    request.session["user_email"] = email
-    request.session["role"] = user["role"]
+    request.session[SessionKey.USER_EMAIL] = email
+    request.session[SessionKey.ROLE] = user["role"]
 
     return {"success": True, "role": user["role"]}
 
@@ -109,22 +109,22 @@ async def logout(request: Request):
 
 @app.get("/customer", response_class=HTMLResponse)
 async def customer_dashboard(request: Request):
-    user = get_current_user(request)
-    if not user or user["role"] != "customer":
+    user = auth.get_current_user(request)
+    if not user or user["role"] != UserRole.CUSTOMER:
         return RedirectResponse(url="/login")
     return templates.TemplateResponse("customer.html", {"request": request, "user": user})
 
 @app.get("/staff", response_class=HTMLResponse)
 async def staff_dashboard(request: Request):
-    user = get_current_user(request)
-    if not user or user["role"] != "staff":
+    user = auth.get_current_user(request)
+    if not user or user["role"] != UserRole.STAFF:
         return RedirectResponse(url="/login")
     return templates.TemplateResponse("staff.html", {"request": request, "user": user})
 
 @app.get("/manager", response_class=HTMLResponse)
 async def manager_dashboard(request: Request):
-    user = get_current_user(request)
-    if not user or user["role"] != "manager":
+    user = auth.get_current_user(request)
+    if not user or user["role"] != UserRole.MANAGER:
         return RedirectResponse(url="/login")
     return templates.TemplateResponse("manager.html", {"request": request, "user": user})
 
@@ -139,38 +139,18 @@ async def get_menu_items():
 
 # UC-13: Quản lý menu - Thêm món mới
 @app.post("/api/menu-items")
-async def create_menu_item(request: Request):
-    user = get_current_user(request)
-    if not user or user["role"] != "manager":
-        raise HTTPException(status_code=403)
-    
+async def create_menu_item(request: Request, user: dict = Depends(auth.require_manager_role)):
     body = await request.json()
-    name = body.get("name")
-    category = body.get("category")
-    price = body.get("price")
-    description = body.get("description", "")
-    image = body.get("image", "")
-    status = body.get("status", "available")
     
-    if not name or not category or price is None:
-        return JSONResponse({
-            "success": False,
-            "message": "Vui lòng điền đầy đủ thông tin (Tên, Danh mục, Giá)"
-        }, status_code=400)
-    
-    # Validate price is a number
     try:
-        price = float(price)
-        if price < 0:
-            return JSONResponse({
-                "success": False,
-                "message": "Giá bán phải là số dương"
-            }, status_code=400)
-    except (ValueError, TypeError):
-        return JSONResponse({
-            "success": False,
-            "message": "Giá bán phải là số"
-        }, status_code=400)
+        name = validate_required(body.get("name"), "Tên món")
+        category = validate_required(body.get("category"), "Danh mục")
+        price = validate_positive_float(body.get("price"), "Giá bán")
+        description = body.get("description", "")
+        image = body.get("image", "")
+        status = body.get("status", MenuItemStatus.AVAILABLE)
+    except ValidationError as e:
+        return handle_validation_error(e)
     
     # Get next ID
     menu_items = db.read_csv("menu_items.csv")
@@ -186,8 +166,7 @@ async def create_menu_item(request: Request):
         "status": status
     }
     
-    fieldnames = ["id", "name", "category", "price", "image", "description", "status"]
-    db.append_csv("menu_items.csv", new_item, fieldnames)
+    db.append_csv("menu_items.csv", new_item, CSVSchemas.MENU_ITEMS)
     
     return JSONResponse({
         "success": True,
@@ -197,11 +176,7 @@ async def create_menu_item(request: Request):
 
 # UC-13: Quản lý menu - Sửa món
 @app.put("/api/menu-items/{item_id}")
-async def update_menu_item(request: Request, item_id: str):
-    user = get_current_user(request)
-    if not user or user["role"] != "manager":
-        raise HTTPException(status_code=403)
-    
+async def update_menu_item(request: Request, item_id: str, user: dict = Depends(auth.require_manager_role)):
     body = await request.json()
     
     # Check if item exists
@@ -214,40 +189,27 @@ async def update_menu_item(request: Request, item_id: str):
     
     # Prepare updates
     updates = {}
-    if "name" in body:
-        if not body["name"]:
-            return JSONResponse({
-                "success": False,
-                "message": "Tên món không được để trống"
-            }, status_code=400)
-        updates["name"] = body["name"]
-    
-    if "category" in body:
-        updates["category"] = body["category"]
-    
-    if "price" in body:
-        try:
-            price = float(body["price"])
-            if price < 0:
-                return JSONResponse({
-                    "success": False,
-                    "message": "Giá bán phải là số dương"
-                }, status_code=400)
+    try:
+        if "name" in body:
+            updates["name"] = validate_required(body["name"], "Tên món")
+        
+        if "category" in body:
+            updates["category"] = body["category"]
+        
+        if "price" in body:
+            price = validate_positive_float(body["price"], "Giá bán")
             updates["price"] = str(price)
-        except (ValueError, TypeError):
-            return JSONResponse({
-                "success": False,
-                "message": "Giá bán phải là số"
-            }, status_code=400)
-    
-    if "description" in body:
-        updates["description"] = body["description"]
-    
-    if "image" in body:
-        updates["image"] = body["image"]
-    
-    if "status" in body:
-        updates["status"] = body["status"]
+        
+        if "description" in body:
+            updates["description"] = body["description"]
+        
+        if "image" in body:
+            updates["image"] = body["image"]
+        
+        if "status" in body:
+            updates["status"] = body["status"]
+    except ValidationError as e:
+        return handle_validation_error(e)
     
     if not updates:
         return JSONResponse({
@@ -256,8 +218,7 @@ async def update_menu_item(request: Request, item_id: str):
         }, status_code=400)
     
     # Update item
-    fieldnames = ["id", "name", "category", "price", "image", "description", "status"]
-    db.update_csv("menu_items.csv", "id", item_id, updates, fieldnames)
+    db.update_csv("menu_items.csv", "id", item_id, updates, CSVSchemas.MENU_ITEMS)
     
     return JSONResponse({
         "success": True,
@@ -266,11 +227,7 @@ async def update_menu_item(request: Request, item_id: str):
 
 # UC-13: Quản lý menu - Xóa/Ẩn món
 @app.delete("/api/menu-items/{item_id}")
-async def delete_menu_item(request: Request, item_id: str):
-    user = get_current_user(request)
-    if not user or user["role"] != "manager":
-        raise HTTPException(status_code=403)
-    
+async def delete_menu_item(request: Request, item_id: str, user: dict = Depends(auth.require_manager_role)):
     # Check if item exists
     existing_item = db.find_one("menu_items.csv", "id", item_id)
     if not existing_item:
@@ -285,16 +242,14 @@ async def delete_menu_item(request: Request, item_id: str):
     
     if has_history:
         # Hide item instead of deleting
-        fieldnames = ["id", "name", "category", "price", "image", "description", "status"]
-        db.update_csv("menu_items.csv", "id", item_id, {"status": "unavailable"}, fieldnames)
+        db.update_csv("menu_items.csv", "id", item_id, {"status": MenuItemStatus.UNAVAILABLE}, CSVSchemas.MENU_ITEMS)
         return JSONResponse({
             "success": True,
             "message": "Món đã được ẩn (ngưng bán) vì đã có lịch sử bán hàng."
         })
     else:
         # Delete item
-        fieldnames = ["id", "name", "category", "price", "image", "description", "status"]
-        db.delete_csv("menu_items.csv", "id", item_id, fieldnames)
+        db.delete_csv("menu_items.csv", "id", item_id, CSVSchemas.MENU_ITEMS)
         return JSONResponse({
             "success": True,
             "message": "Xóa món thành công."
@@ -335,7 +290,7 @@ async def get_orders(request: Request):
             "status": order["status"]
         }
         
-        if user["role"] == "customer":
+        if user["role"] == UserRole.CUSTOMER:
             # Only show customer's orders
             if order.get("customer_email") == user["email"]:
                 result_orders.append(order_data)
@@ -372,7 +327,7 @@ async def update_table_status(request: Request, table_id: str):
     body = await request.json()
     new_status = body.get("status")
     
-    if not new_status or new_status not in ["available", "occupied", "reserved"]:
+    if not new_status or new_status not in [TableStatus.AVAILABLE, TableStatus.OCCUPIED, TableStatus.RESERVED]:
         return JSONResponse({
             "success": False,
             "message": "Trạng thái không hợp lệ"
@@ -385,8 +340,7 @@ async def update_table_status(request: Request, table_id: str):
             "message": "Bàn không tồn tại"
         }, status_code=404)
     
-    fieldnames = ["id", "number", "capacity", "status"]
-    db.update_csv("tables.csv", "id", table_id, {"status": new_status}, fieldnames)
+    db.update_csv("tables.csv", "id", table_id, {"status": new_status}, CSVSchemas.TABLES)
     
     return JSONResponse({
         "success": True,
@@ -412,7 +366,7 @@ async def assign_table_to_order(request: Request, table_id: str):
             "message": "Bàn không tồn tại"
         }, status_code=404)
     
-    if table["status"] == "occupied":
+    if table["status"] == TableStatus.OCCUPIED:
         return JSONResponse({
             "success": False,
             "message": "Bàn đang được sử dụng"
@@ -420,7 +374,7 @@ async def assign_table_to_order(request: Request, table_id: str):
     
     # Update table status
     fieldnames = ["id", "number", "capacity", "status"]
-    db.update_csv("tables.csv", "id", table_id, {"status": "occupied"}, fieldnames)
+    db.update_csv("tables.csv", "id", table_id, {"status": TableStatus.OCCUPIED}, fieldnames)
     
     # Update order with table_id if order_id provided
     if order_id:
@@ -451,7 +405,7 @@ async def clear_table(request: Request, table_id: str):
         }, status_code=404)
     
     fieldnames = ["id", "number", "capacity", "status"]
-    db.update_csv("tables.csv", "id", table_id, {"status": "available"}, fieldnames)
+    db.update_csv("tables.csv", "id", table_id, {"status": TableStatus.AVAILABLE}, fieldnames)
     
     return JSONResponse({
         "success": True,
@@ -519,7 +473,7 @@ async def create_reservation(request: Request):
         }, status_code=400)
     
     # Create reservation
-    reservation_id = f"RES-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    reservation_id = f"{OrderPrefix.RESERVATION}{datetime.now().strftime('%Y%m%d%H%M%S')}"
     # Assign first available table
     assigned_table = available_tables[0]
     
@@ -541,7 +495,7 @@ async def create_reservation(request: Request):
     
     # Update table status to reserved
     table_fieldnames = ["id", "number", "capacity", "status"]
-    db.update_csv("tables.csv", "id", assigned_table["id"], {"status": "reserved"}, table_fieldnames)
+    db.update_csv("tables.csv", "id", assigned_table["id"], {"status": TableStatus.RESERVED}, table_fieldnames)
     
     return JSONResponse({
         "success": True,
@@ -565,7 +519,7 @@ async def get_reservations(request: Request):
     result = []
     for res in reservations:
         # Filter by user role
-        if user["role"] == "customer":
+        if user["role"] == UserRole.CUSTOMER:
             if res.get("customer_email") != user["email"]:
                 continue
         # Staff and manager see all reservations
@@ -646,8 +600,7 @@ async def update_min_stock(request: Request, item_id: str):
             "message": "Nguyên liệu không tồn tại"
         }, status_code=404)
     
-    fieldnames = ["id", "name", "quantity", "unit", "minStock", "supplier"]
-    db.update_csv("inventory.csv", "id", item_id, {"minStock": str(min_stock)}, fieldnames)
+    db.update_csv("inventory.csv", "id", item_id, {"minStock": str(min_stock)}, CSVSchemas.INVENTORY)
     
     return JSONResponse({
         "success": True,
@@ -711,8 +664,7 @@ async def create_staff(request: Request):
         "roles": ",".join(roles) if roles else "staff"  # Store roles as comma-separated
     }
     
-    user_fieldnames = ["id", "name", "email", "password", "phone", "role"]
-    db.append_csv("users.csv", new_user, user_fieldnames)
+    db.append_csv("users.csv", new_user, CSVSchemas.USERS)
     
     # Create staff record
     staff_list = db.read_csv("staff.csv")
@@ -728,8 +680,7 @@ async def create_staff(request: Request):
         "schedule": ""
     }
     
-    staff_fieldnames = ["id", "name", "role", "email", "phone", "status", "schedule"]
-    db.append_csv("staff.csv", new_staff, staff_fieldnames)
+    db.append_csv("staff.csv", new_staff, CSVSchemas.STAFF)
     
     return JSONResponse({
         "success": True,
@@ -764,8 +715,7 @@ async def update_staff(request: Request, staff_id: str):
         updates["schedule"] = body["schedule"]
     
     if updates:
-        staff_fieldnames = ["id", "name", "role", "email", "phone", "status", "schedule"]
-        db.update_csv("staff.csv", "id", staff_id, updates, staff_fieldnames)
+        db.update_csv("staff.csv", "id", staff_id, updates, CSVSchemas.STAFF)
         
         # Also update user roles if provided
         if "roles" in body:
@@ -773,11 +723,10 @@ async def update_staff(request: Request, staff_id: str):
             if user_email:
                 user_record = db.find_one("users.csv", "email", user_email)
                 if user_record:
-                    user_fieldnames = ["id", "name", "email", "password", "phone", "role"]
                     db.update_csv("users.csv", "email", user_email, {
-                        "role": "staff",
+                        "role": UserRole.STAFF,
                         "roles": ",".join(body["roles"]) if isinstance(body["roles"], list) else body["roles"]
-                    }, user_fieldnames)
+                    }, CSVSchemas.USERS)
     
     return JSONResponse({
         "success": True,
@@ -1351,7 +1300,7 @@ async def create_order(request: Request):
         table = db.find_one("tables.csv", "id", table_id)
         if table:
             table_fieldnames = ["id", "number", "capacity", "status"]
-            db.update_csv("tables.csv", "id", table_id, {"status": "occupied"}, table_fieldnames)
+            db.update_csv("tables.csv", "id", table_id, {"status": TableStatus.OCCUPIED}, table_fieldnames)
     
     # Create order record
     new_order = {
